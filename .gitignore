@@ -52,6 +52,8 @@ test_comments/
 
 # Environment files
 .env
+.env.docker
+.env.local
 CLAUDE.md
 
 # UV

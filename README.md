@@ -307,6 +307,10 @@ The execution agent provides:
 Since DARTS requires Linux libraries, macOS users must use Docker:
 
 ```bash
+# Copy environment variables template
+cp .env.docker.example .env.docker
+# Edit .env.docker and add your OpenAI API key
+
 # Build and run with Docker Compose
 docker-compose up -d
 
@@ -314,7 +318,10 @@ docker-compose up -d
 open http://localhost:8502
 
 # Run CLI commands in Docker
-docker-compose run dartsgpt-cli uv run python main.py generate "Your prompt" --execute
+docker-compose run dartsgpt-cli uv run python main.py generate "Your prompt"
+
+# Or use the helper script
+./docker-run.sh generate "Your prompt"
 ```
 
 ## 📚 Usage Examples
