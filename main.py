@@ -30,7 +30,8 @@ def cli():
 @click.option('--output-dir', '-o', default='output', help='Output directory for generated files')
 @click.option('--verbose', '-v', is_flag=True, help='Verbose output')
 @click.option('--dry-run', is_flag=True, help='Show what would be generated without saving files')
-def generate(prompt: str, output_dir: str, verbose: bool, dry_run: bool):
+@click.option('--execute', '-e', is_flag=True, help='Execute the generated model after creation')
+def generate(prompt: str, output_dir: str, verbose: bool, dry_run: bool, execute: bool):
     """Generate DARTS model from natural language prompt using multi-agent orchestration."""
     
     # Check configuration
@@ -51,7 +52,11 @@ def generate(prompt: str, output_dir: str, verbose: bool, dry_run: bool):
         task = progress.add_task("Running multi-agent orchestration...", total=None)
         
         try:
-            result = run_dartsgpt_orchestrator(prompt, output_dir if not dry_run else None)
+            result = run_dartsgpt_orchestrator(
+                prompt, 
+                output_dir if not dry_run else None,
+                execute=execute and not dry_run
+            )
             progress.update(task, completed=True)
         except Exception as e:
             progress.stop()
@@ -82,6 +87,16 @@ def generate(prompt: str, output_dir: str, verbose: bool, dry_run: bool):
         table.add_row("Physics Type", str(result['parameters'].get('physics_type', 'N/A')))
         table.add_row("Grid Size", str(result['parameters'].get('grid_parameters', {})))
         table.add_row("Validation", "✅ Passed" if result['validation'].get('issues', []) == [] else "⚠️  Has issues")
+        
+        # Add execution info if available
+        if execute and result.get('execution'):
+            exec_result = result['execution']
+            exec_status = "✅ Success" if exec_result.get('success') else "❌ Failed"
+            exec_time = f"{exec_result.get('execution_time', 0):.2f}s"
+            table.add_row("Execution", f"{exec_status} ({exec_time})")
+            
+            if exec_result.get('summary', {}).get('simulation_completed'):
+                table.add_row("Simulation", "✅ Completed")
         
         console.print(table)
         
@@ -214,7 +229,7 @@ def demo(interactive: bool):
             output_dir = f"demo_output/demo_{i}"
             
             try:
-                result = run_dartsgpt_orchestrator(prompt, output_dir)
+                result = run_dartsgpt_orchestrator(prompt, output_dir, execute=False)
                 if result.get('success'):
                     console.print(f"[green]✅ Demo {i} completed![/green]")
             except Exception as e:
@@ -225,7 +240,7 @@ def demo(interactive: bool):
     
     # Run single demo
     output_dir = "demo_output/interactive"
-    result = run_dartsgpt_orchestrator(prompt, output_dir)
+    result = run_dartsgpt_orchestrator(prompt, output_dir, execute=False)
     
     if result.get('success'):
         console.print(f"\n[green]✅ Demo completed! Files saved to {output_dir}/[/green]")

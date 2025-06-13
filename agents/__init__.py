@@ -6,6 +6,7 @@ from .template_selector import TemplateSelectorAgent
 from .parameter_extractor import ParameterExtractorAgent
 from .code_generator import CodeGeneratorAgent
 from .validator import ValidatorAgent
+from .executor import ExecutorAgent
 
 __all__ = [
     "BaseAgent",
@@ -15,5 +16,6 @@ __all__ = [
     "TemplateSelectorAgent",
     "ParameterExtractorAgent",
     "CodeGeneratorAgent",
-    "ValidatorAgent"
+    "ValidatorAgent",
+    "ExecutorAgent"
 ]

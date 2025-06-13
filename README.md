@@ -217,6 +217,9 @@ uv run python main.py generate "Model a geothermal reservoir" --dry-run
 # Verbose output showing agent decisions
 uv run python main.py generate "Create a black oil model" --verbose
 
+# Generate AND execute the model (requires Docker on macOS)
+uv run python main.py generate "Create a simple dead oil model" --execute
+
 # List available templates
 uv run python main.py list-templates
 
@@ -246,6 +249,72 @@ if result['success']:
     print(f"Model generated successfully!")
     print(f"Template used: {result['template_used']}")
     print(f"Files saved to: geothermal_model/")
+
+# Generate and execute model
+result = run_dartsgpt_orchestrator(
+    prompt="Create a simple waterflood model",
+    output_dir="waterflood_model",
+    execute=True  # This will run the model after generation
+)
+
+if result['success'] and result.get('execution'):
+    print(f"Execution completed: {result['execution']['success']}")
+    print(f"Simulation time: {result['execution']['execution_time']:.2f}s")
+```
+
+## 🚀 Model Execution
+
+DARTSGPT can automatically execute the generated models, providing immediate validation and results.
+
+### Execution Features
+
+- **Automatic execution** after generation with `--execute` flag
+- **Real-time output streaming** during simulation
+- **Resource monitoring** (memory, CPU usage)
+- **Execution report** with convergence status and metrics
+
+### Platform Compatibility
+
+⚠️ **Important Note**: DARTS (open-darts) only runs on Linux x86_64. 
+- **Linux**: Full functionality including model execution
+- **macOS/Windows**: Model generation and validation only
+- **Solution**: Use a Linux machine or VM for model execution
+
+### Using Model Execution (Linux Only)
+
+#### Command Line
+```bash
+# Generate and execute a model
+uv run python main.py generate "Create a CO2 injection model" --execute
+
+# Execute an existing model
+uv run python main.py execute output/model_folder/
+```
+
+#### Streamlit Interface
+Simply check the "Execute generated model" checkbox before clicking "Generate DARTS Model".
+
+#### Execution Output
+The execution agent provides:
+- Simulation progress and convergence status
+- Time step information
+- Warning and error messages
+- Final simulation metrics
+- Location of result files
+
+### Docker Setup for Cross-Platform Development
+
+Since DARTS requires Linux libraries, macOS users must use Docker:
+
+```bash
+# Build and run with Docker Compose
+docker-compose up -d
+
+# Access Streamlit UI
+open http://localhost:8502
+
+# Run CLI commands in Docker
+docker-compose run dartsgpt-cli uv run python main.py generate "Your prompt" --execute
 ```
 
 ## 📚 Usage Examples

@@ -1,0 +1,16 @@
+{
+  "prompt": "Build a ccs model of a reservoir with porosity 0.25, perm 100 md and 2 wells",
+  "template_used": "2ph_comp",
+  "parameters": {
+    "grid_parameters": {},
+    "rock_properties": {
+      "permeability": 100.0
+    }
+  },
+  "validation": {
+    "syntax_valid": true,
+    "imports_valid": true,
+    "structure_valid": true,
+    "issues": []
+  }
+}

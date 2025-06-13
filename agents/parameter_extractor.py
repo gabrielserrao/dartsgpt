@@ -259,11 +259,11 @@ class ParameterExtractorAgent(BaseAgent):
             elif from_unit == "m3/day":
                 return value / 86400, "m3/s"
             
-            # Permeability conversions
+            # Permeability conversions - keep in mD
             if from_unit in ["md", "millidarcy"]:
-                return value * UNIT_CONVERSIONS["md_to_m2"], "m2"
+                return value, "mD"
             elif from_unit == "darcy":
-                return value * UNIT_CONVERSIONS["d_to_m2"], "m2"
+                return value * 1000, "mD"  # Convert darcy to millidarcy
             
             # Time conversions
             if from_unit == "years":
@@ -301,7 +301,7 @@ class ParameterExtractorAgent(BaseAgent):
                 },
                 "rock": {
                     "porosity": 0.2,
-                    "permeability": 100e-15,  # m2 (100 mD)
+                    "permeability": 100,  # mD
                     "compressibility": 1e-9   # 1/Pa
                 },
                 "simulation": {
@@ -364,9 +364,9 @@ class ParameterExtractorAgent(BaseAgent):
                 elif parameters["porosity"] < 0.01 or parameters["porosity"] > 0.5:
                     warnings.setdefault("porosity", []).append(f"Porosity {parameters['porosity']} is unusual")
             
-            # Permeability validation (in m2)
+            # Permeability validation (in mD)
             if "permeability" in parameters:
-                perm_md = parameters["permeability"] / UNIT_CONVERSIONS["md_to_m2"]
+                perm_md = parameters["permeability"]
                 if perm_md < 0.01 or perm_md > 10000:
                     warnings.setdefault("permeability", []).append(f"Permeability {perm_md} mD is unusual")
             
@@ -541,7 +541,7 @@ Instructions:
             # Fallback to basic parameter set
             fallback_params = {
                 "grid_parameters": converted_params if converted_params else {"nx": 50, "ny": 50, "nz": 10},
-                "rock_properties": {"porosity": 0.2, "permeability": 100e-15},
+                "rock_properties": {"porosity": 0.2, "permeability": 100},  # permeability in mD
                 "fluid_properties": {},
                 "well_parameters": {},
                 "simulation_parameters": {"total_time": 365, "time_step": 1},

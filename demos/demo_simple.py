@@ -78,7 +78,7 @@ def simple_parameter_extractor(prompt: str) -> dict:
     perm_match = re.search(perm_pattern, prompt, re.I)
     if perm_match:
         perm_md = float(perm_match.group(1))
-        params["rock_properties"]["permeability"] = perm_md * UNIT_CONVERSIONS["md_to_m2"]
+        params["rock_properties"]["permeability"] = perm_md  # Keep in mD
     
     # Temperature
     temp_pattern = r'(\d+(?:\.\d+)?)\s*°?[CF]'
@@ -129,7 +129,7 @@ def generate_simple_code(template_name: str, parameters: dict) -> dict:
     # Get rock properties
     rock = parameters.get("rock_properties", {})
     poro = rock.get("porosity", 0.2)
-    perm = rock.get("permeability", 100e-15)
+    perm = rock.get("permeability", 100)  # permeability in mD
     
     model_code = f'''"""Generated DARTS model using template: {template_name}"""
 
@@ -164,7 +164,7 @@ class Model(CICDModel):
         
         # Rock properties
         self.porosity = np.ones((self.nx, self.ny, self.nz)) * {poro}
-        self.permeability = np.ones((self.nx, self.ny, self.nz)) * {perm}  # m2
+        self.permeability = np.ones((self.nx, self.ny, self.nz)) * {perm}  # mD
         
     def set_wells(self):
         """Set up well locations and perforations."""

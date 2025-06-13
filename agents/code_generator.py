@@ -219,10 +219,10 @@ if __name__ == "__main__":
             # Rock properties
             code_lines.append("# Rock properties")
             porosity = rock_props.get("porosity", 0.2)
-            permeability = rock_props.get("permeability", 100e-15)
+            permeability = rock_props.get("permeability", 100)  # Default 100 mD
             
             code_lines.append(f"self.porosity = np.ones((self.nx, self.ny, self.nz)) * {porosity}")
-            code_lines.append(f"self.permeability = np.ones((self.nx, self.ny, self.nz)) * {permeability}  # m2")
+            code_lines.append(f"self.permeability = np.ones((self.nx, self.ny, self.nz)) * {permeability}  # mD")
             
             # Depth calculation if provided
             if "depth" in grid_params:

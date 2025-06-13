@@ -1,33 +1,11 @@
-version: '3.8'
-
 services:
   dartsgpt:
     build:
       context: .
       dockerfile: Dockerfile
     container_name: dartsgpt
-    environment:
-      # OpenAI Configuration
-      - OPENAI_API_KEY=${OPENAI_API_KEY}
-      - OPENAI_MODEL=${OPENAI_MODEL:-gpt-4o-mini}
-      
-      # Vector Store Configuration
-      - VECTOR_STORE_TYPE=${VECTOR_STORE_TYPE:-chroma}
-      - VECTOR_STORE_PATH=/app/embeddings
-      
-      # LangChain Configuration (optional)
-      - LANGCHAIN_API_KEY=${LANGCHAIN_API_KEY}
-      - LANGCHAIN_TRACING_V2=${LANGCHAIN_TRACING_V2:-true}
-      - LANGCHAIN_PROJECT=${LANGCHAIN_PROJECT:-dartsgpt}
-      
-      # DARTS Configuration
-      - DARTS_MODELS_PATH=/app/knowledge/darts-code/open-darts-main/models
-      - DARTS_DEVELOPMENT_PATH=/app/knowledge/darts-code/darts-models-development
-      - DARTS_TEMPLATES_PATH=/app/knowledge/templates
-      
-      # Application Configuration
-      - LOG_LEVEL=${LOG_LEVEL:-INFO}
-      - DEBUG_MODE=${DEBUG_MODE:-false}
+    env_file:
+      - .env.docker
       
     ports:
       - "8502:8502"  # Streamlit UI
@@ -60,20 +38,8 @@ services:
       context: .
       dockerfile: Dockerfile
     container_name: dartsgpt-cli
-    environment:
-      # Same environment variables as above
-      - OPENAI_API_KEY=${OPENAI_API_KEY}
-      - OPENAI_MODEL=${OPENAI_MODEL:-gpt-4o-mini}
-      - VECTOR_STORE_TYPE=${VECTOR_STORE_TYPE:-chroma}
-      - VECTOR_STORE_PATH=/app/embeddings
-      - LANGCHAIN_API_KEY=${LANGCHAIN_API_KEY}
-      - LANGCHAIN_TRACING_V2=${LANGCHAIN_TRACING_V2:-true}
-      - LANGCHAIN_PROJECT=${LANGCHAIN_PROJECT:-dartsgpt}
-      - DARTS_MODELS_PATH=/app/knowledge/darts-code/open-darts-main/models
-      - DARTS_DEVELOPMENT_PATH=/app/knowledge/darts-code/darts-models-development
-      - DARTS_TEMPLATES_PATH=/app/knowledge/templates
-      - LOG_LEVEL=${LOG_LEVEL:-INFO}
-      - DEBUG_MODE=${DEBUG_MODE:-false}
+    env_file:
+      - .env.docker
     
     volumes:
       - ./embeddings:/app/embeddings

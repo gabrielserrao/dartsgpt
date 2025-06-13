@@ -120,7 +120,7 @@ UNIT_CONVERSIONS = {
     "stb_d_to_m3_s": 1.84013e-6,
     "mscf_d_to_m3_s": 0.327741,
     
-    # Permeability
-    "md_to_m2": 9.869233e-16,
-    "d_to_m2": 9.869233e-13
+    # Permeability (Note: DARTS uses mD directly, these conversions are kept for reference only)
+    "md_to_m2": 9.869233e-16,  # Not used - DARTS accepts mD directly
+    "d_to_m2": 9.869233e-13    # Not used - DARTS accepts mD directly
 }

@@ -10,9 +10,9 @@ from langchain_community.vectorstores import Chroma
 from langchain_core.documents import Document
 from langchain_openai import OpenAIEmbeddings
 
-from dartsgpt.config import settings
-from dartsgpt.knowledge.model_analyzer import DARTSModelAnalyzer
-from dartsgpt.knowledge.templates.template_database import TemplateDatabase
+from config import settings
+from knowledge.model_analyzer import DARTSModelAnalyzer
+from knowledge.templates.template_database import TemplateDatabase
 
 
 class DARTSKnowledgeBase:

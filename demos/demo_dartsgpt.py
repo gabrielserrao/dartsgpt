@@ -74,7 +74,7 @@ def simple_parameter_extractor(prompt: str) -> dict:
     perm_match = re.search(perm_pattern, prompt, re.I)
     if perm_match:
         perm_md = float(perm_match.group(1))
-        params["rock_properties"]["permeability"] = perm_md * UNIT_CONVERSIONS["md_to_m2"]
+        params["rock_properties"]["permeability"] = perm_md  # Keep in mD
     
     # Temperature
     temp_pattern = r'(\d+(?:\.\d+)?)\s*°?[CF]'

@@ -192,7 +192,8 @@ if 'agents_status' not in st.session_state:
         'template_selector': {'status': 'waiting', 'message': 'Ready to select template'},
         'parameter_extractor': {'status': 'waiting', 'message': 'Ready to extract parameters'},
         'code_generator': {'status': 'waiting', 'message': 'Ready to generate code'},
-        'validator': {'status': 'waiting', 'message': 'Ready to validate'}
+        'validator': {'status': 'waiting', 'message': 'Ready to validate'},
+        'executor': {'status': 'waiting', 'message': 'Ready to execute'}
     }
 
 if 'generation_history' not in st.session_state:
@@ -291,6 +292,7 @@ with tab1:
         include_comments = st.checkbox("Include detailed comments", value=True)
         dry_run = st.checkbox("Preview only (don't save)", value=False)
         verbose = st.checkbox("Show detailed logs", value=True)
+        execute_model = st.checkbox("Execute generated model", value=False, help="Run the model after generation (requires Docker)")
     
     # Function to render agent cards
     def render_agent_card(placeholder, agent_name: str, status: dict):
@@ -308,7 +310,8 @@ with tab1:
             'template_selector': '📋',
             'parameter_extractor': '🔢',
             'code_generator': '💻',
-            'validator': '✅'
+            'validator': '✅',
+            'executor': '🚀'
         }.get(agent_name, '🤖')
         
         agent_display = agent_name.replace('_', ' ').title()
@@ -378,7 +381,9 @@ with tab1:
                 # Create initial state
                 initial_state = {
                     "messages": [HumanMessage(content=prompt)],
-                    "prompt": prompt
+                    "prompt": prompt,
+                    "execute_model": execute_model and not dry_run,
+                    "output_dir": "output"
                 }
                 
                 # Simulate agent workflow with updates
@@ -388,8 +393,12 @@ with tab1:
                     ("template_selector", "Selecting best template...", 0.4),
                     ("parameter_extractor", "Extracting parameters...", 0.5),
                     ("code_generator", "Generating DARTS code...", 0.7),
-                    ("validator", "Validating output...", 0.9)
+                    ("validator", "Validating output...", 0.8)
                 ]
+                
+                # Add executor if requested
+                if execute_model and not dry_run:
+                    agents_sequence.append(("executor", "Executing DARTS model...", 0.95))
                 
                 # Run through agents with visual updates
                 for agent_name, message, progress in agents_sequence:
@@ -471,7 +480,11 @@ with tab1:
                     # Display generated code
                     st.markdown("### 📄 Generated Files")
                     
-                    tab_model, tab_main, tab_params = st.tabs(["model.py", "main.py", "parameters.json"])
+                    # Add execution tab if model was executed
+                    if execute_model and final_output.get('execution'):
+                        tab_model, tab_main, tab_params, tab_exec = st.tabs(["model.py", "main.py", "parameters.json", "execution.log"])
+                    else:
+                        tab_model, tab_main, tab_params = st.tabs(["model.py", "main.py", "parameters.json"])
                     
                     with tab_model:
                         st.code(final_output.get('model_code', ''), language='python')
@@ -503,6 +516,41 @@ with tab1:
                                 "parameters.json",
                                 "application/json"
                             )
+                    
+                    # Display execution results if available
+                    if execute_model and final_output.get('execution'):
+                        with tab_exec:
+                            exec_result = final_output['execution']
+                            
+                            # Show execution status
+                            if exec_result.get('success'):
+                                st.success(f"✅ Model executed successfully in {exec_result.get('execution_time', 0):.2f} seconds")
+                            else:
+                                st.error("❌ Execution failed")
+                            
+                            # Show execution output
+                            if exec_result.get('output'):
+                                st.markdown("**Output:**")
+                                st.code(exec_result['output'], language='text')
+                            
+                            # Show execution errors if any
+                            if exec_result.get('error'):
+                                st.markdown("**Errors:**")
+                                st.code(exec_result['error'], language='text')
+                            
+                            # Show summary metrics
+                            if exec_result.get('summary'):
+                                summary = exec_result['summary']
+                                st.markdown("**Execution Summary:**")
+                                sum_col1, sum_col2 = st.columns(2)
+                                with sum_col1:
+                                    st.metric("Simulation Completed", "✅ Yes" if summary.get('simulation_completed') else "❌ No")
+                                    st.metric("Convergence", "✅ Yes" if summary.get('convergence_achieved') else "❌ No")
+                                with sum_col2:
+                                    if summary.get('final_time'):
+                                        st.metric("Final Time", f"{summary['final_time']} days")
+                                    if summary.get('warnings'):
+                                        st.metric("Warnings", len(summary['warnings']))
                     
                     # Save files if not dry run
                     if not dry_run:

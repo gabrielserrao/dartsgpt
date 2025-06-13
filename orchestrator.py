@@ -29,7 +29,9 @@ class DARTSGPTState(MessagesState):
     model_code: str
     main_code: str
     validation_result: Dict[str, Any]
+    execution_result: Dict[str, Any]
     final_output: Dict[str, Any]
+    execute_model: bool
 
 
 # Intent Classifier Agent
@@ -227,17 +229,38 @@ def create_parameter_extractor(model: ChatOpenAI) -> callable:
                 parameters["grid_parameters"]["ny"] = int(grid_match.group(2))
                 parameters["grid_parameters"]["nz"] = int(grid_match.group(3))
             
-            # Porosity extraction
+            # Porosity extraction - try percentage format first
             poro_pattern = r'(\d+(?:\.\d+)?)\s*%\s*porosity'
             poro_match = re.search(poro_pattern, state['prompt'], re.IGNORECASE)
             if poro_match:
                 parameters["rock_properties"]["porosity"] = float(poro_match.group(1)) / 100.0
+            else:
+                # Try direct format (e.g., "porosity 0.25")
+                poro_pattern2 = r'porosity\s+(\d+(?:\.\d+)?)'
+                poro_match2 = re.search(poro_pattern2, state['prompt'], re.IGNORECASE)
+                if poro_match2:
+                    poro_value = float(poro_match2.group(1))
+                    # If value > 1, assume it's percentage
+                    if poro_value > 1:
+                        poro_value = poro_value / 100.0
+                    parameters["rock_properties"]["porosity"] = poro_value
             
             # Permeability extraction
             perm_pattern = r'(\d+(?:\.\d+)?)\s*m[Dd]'
             perm_match = re.search(perm_pattern, state['prompt'], re.IGNORECASE)
             if perm_match:
                 parameters["rock_properties"]["permeability"] = float(perm_match.group(1))
+            
+            # Well count extraction
+            parameters["well_parameters"] = {}
+            well_pattern = r'(\d+)\s+wells?'
+            well_match = re.search(well_pattern, state['prompt'], re.IGNORECASE)
+            if well_match:
+                well_count = int(well_match.group(1))
+                # Assume equal split between injectors and producers
+                parameters["well_parameters"]["total_wells"] = well_count
+                parameters["well_parameters"]["injection_wells"] = well_count // 2
+                parameters["well_parameters"]["production_wells"] = well_count - (well_count // 2)
         
         print(f"🔢 Parameters extracted: {parameters}")
         
@@ -273,9 +296,7 @@ def create_code_generator(model: ChatOpenAI) -> callable:
         
         rock = parameters.get('rock_properties', {})
         poro = rock.get('porosity') if rock.get('porosity') is not None else 0.2
-        perm_md = rock.get('permeability') if rock.get('permeability') is not None else 100.0  # in mD
-        # Convert permeability from mD to m²
-        perm = perm_md * 9.869233e-16  # m²
+        perm = rock.get('permeability') if rock.get('permeability') is not None else 100.0  # in mD
         
         well_params = parameters.get('well_parameters', {})
         inj_rate = well_params.get('injection_rate') if well_params.get('injection_rate') is not None else 100.0
@@ -328,6 +349,7 @@ The code includes explanatory comments showing how your requirements were interp
 
 import numpy as np
 from darts.models.reservoirmodel import ReservoirModel
+from darts.reservoirs.struct_reservoir import StructReservoir
 from darts.physics.{template.physics_type} import {template.physics_type.title().replace("_", "")}
 from darts.tools.keyword_file_tools import load_single_keyword
 
@@ -366,28 +388,17 @@ class Model(ReservoirModel):
         
         {grid_comment}
         """
-        # Grid dimensions
-        self.nx = {nx}  # Number of cells in X direction
-        self.ny = {ny}  # Number of cells in Y direction  
-        self.nz = {nz}  # Number of cells in Z direction (layers)
-        
-        # Cell dimensions (m)
-        self.dx = 10.0  # Cell size in X direction
-        self.dy = 10.0  # Cell size in Y direction
-        self.dz = 2.0   # Cell thickness
-        
-        # Total reservoir dimensions: {nx*10}m x {ny*10}m x {nz*2}m
-        
-        # Rock properties
+        # Initialize structured reservoir
+        # {'Permeability extracted from prompt' if perm != 100 else 'Using default permeability (not specified)'}
         # {'Porosity extracted from prompt' if poro != 0.2 else 'Using default porosity (not specified)'}
-        self.porosity = np.ones((self.nx, self.ny, self.nz)) * {poro}
-        
-        # {'Permeability extracted from prompt' if perm != 100e-15 else 'Using default permeability (not specified)'}
-        self.permeability = np.ones((self.nx, self.ny, self.nz)) * {perm}  # m²
-        # Note: {perm} m² = {perm/9.869233e-16:.1f} mD
-        
-        # Initialize the reservoir grid with these properties
-        self.init_reservoir()
+        self.reservoir = StructReservoir(
+            self.timer,
+            nx={nx}, ny={ny}, nz={nz},  # Grid dimensions
+            dx=10.0, dy=10.0, dz=2.0,   # Cell dimensions (m)
+            permx={perm}, permy={perm}, permz={perm},  # Permeability in mD
+            poro={poro},                # Porosity (fraction)
+            depth=1000                  # Reservoir depth (m)
+        )
         
     def set_wells(self):
         """
@@ -555,7 +566,7 @@ if __name__ == "__main__":
 def create_validator(model: ChatOpenAI) -> callable:
     """Create the validation agent."""
     
-    def validator(state: DARTSGPTState) -> Command[Literal[END]]:
+    def validator(state: DARTSGPTState) -> Command[Literal["executor", END]]:
         """Validate the generated code."""
         
         validation_result = {
@@ -588,6 +599,19 @@ def create_validator(model: ChatOpenAI) -> callable:
         
         print(f"✅ Validation {'passed' if validation_passed else 'failed'}")
         
+        # Check if execution is requested
+        execute_model = state.get('execute_model', False)
+        
+        if validation_passed and execute_model:
+            print("🚀 Validation passed, proceeding to execution...")
+            return Command(
+                goto="executor",
+                update={
+                    "validation_result": validation_result,
+                    "current_agent": "executor"
+                }
+            )
+        
         # Prepare final output
         final_output = {
             "success": True,
@@ -610,11 +634,61 @@ def create_validator(model: ChatOpenAI) -> callable:
     return validator
 
 
+# Executor Agent
+def create_executor(model: ChatOpenAI) -> callable:
+    """Create the execution agent."""
+    
+    def executor(state: DARTSGPTState) -> Command[Literal[END]]:
+        """Execute the generated DARTS model."""
+        
+        from agents.executor import ExecutorAgent
+        from utils.executor import format_execution_report
+        
+        # Get output directory
+        output_dir = state.get('output_dir', 'output')
+        
+        # Create executor agent
+        executor_agent = ExecutorAgent()
+        
+        # Execute the model
+        print(f"\n🚀 Executing DARTS model...")
+        result = executor_agent.process({"output_dir": output_dir})
+        
+        execution_result = result.data
+        
+        # Format report
+        if execution_result.get('output'):
+            report = format_execution_report(execution_result)
+            print(report)
+        
+        # Update final output with execution results
+        final_output = {
+            "success": execution_result.get('success', False),
+            "model_code": state['model_code'],
+            "main_code": state['main_code'],
+            "template_used": state['selected_template'],
+            "parameters": state['parameters'],
+            "validation": state['validation_result'],
+            "execution": execution_result
+        }
+        
+        return Command(
+            goto=END,
+            update={
+                "execution_result": execution_result,
+                "final_output": final_output,
+                "current_agent": "completed"
+            }
+        )
+    
+    return executor
+
+
 # Supervisor Agent
 def create_supervisor(model: ChatOpenAI) -> callable:
     """Create the supervisor agent that orchestrates the workflow."""
     
-    def supervisor(state: DARTSGPTState) -> Command[Literal["intent_classifier", "template_selector", "parameter_extractor", "code_generator", "validator", END]]:
+    def supervisor(state: DARTSGPTState) -> Command[Literal["intent_classifier", "template_selector", "parameter_extractor", "code_generator", "validator", "executor", END]]:
         """Supervise the multi-agent workflow."""
         
         # Initial routing - start with intent classification
@@ -657,6 +731,7 @@ def build_dartsgpt_graph(model: ChatOpenAI = None) -> StateGraph:
     parameter_agent = create_parameter_extractor(model)
     code_agent = create_code_generator(model)
     validator_agent = create_validator(model)
+    executor_agent = create_executor(model)
     
     # Add nodes
     builder.add_node("supervisor", supervisor_agent)
@@ -665,6 +740,7 @@ def build_dartsgpt_graph(model: ChatOpenAI = None) -> StateGraph:
     builder.add_node("parameter_extractor", parameter_agent)
     builder.add_node("code_generator", code_agent)
     builder.add_node("validator", validator_agent)
+    builder.add_node("executor", executor_agent)
     
     # Set entry point
     builder.add_edge(START, "supervisor")
@@ -675,18 +751,20 @@ def build_dartsgpt_graph(model: ChatOpenAI = None) -> StateGraph:
     builder.add_edge("parameter_extractor", "code_generator")
     builder.add_edge("code_generator", "validator")
     builder.add_edge("validator", END)
+    builder.add_edge("executor", END)
     
     # Compile the graph
     return builder.compile()
 
 
-def run_dartsgpt_orchestrator(prompt: str, output_dir: str = "output") -> Dict[str, Any]:
+def run_dartsgpt_orchestrator(prompt: str, output_dir: str = "output", execute: bool = False) -> Dict[str, Any]:
     """Run the DARTSGPT orchestrator with a given prompt."""
     
     print(f"\n{'='*60}")
     print(f"DARTSGPT Multi-Agent Orchestrator")
     print(f"{'='*60}")
     print(f"Prompt: {prompt}")
+    print(f"Execute: {execute}")
     print(f"{'='*60}\n")
     
     # Build the graph
@@ -695,7 +773,9 @@ def run_dartsgpt_orchestrator(prompt: str, output_dir: str = "output") -> Dict[s
     # Initialize state
     initial_state = {
         "messages": [HumanMessage(content=prompt)],
-        "prompt": prompt
+        "prompt": prompt,
+        "execute_model": execute,
+        "output_dir": output_dir
     }
     
     # Run the graph
