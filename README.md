@@ -133,7 +133,7 @@ DARTSGPT uses a sophisticated multi-agent architecture powered by LangGraph:
 ### Step 1: Clone the Repository
 
 ```bash
-git clone https://github.com/yourusername/dartsgpt.git
+git clone https://github.com/gabrielserrao/dartsgpt.git
 cd dartsgpt
 ```
 
