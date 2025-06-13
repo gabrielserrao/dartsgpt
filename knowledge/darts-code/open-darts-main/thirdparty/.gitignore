@@ -1,0 +1,9 @@
+# Ignore binary files
+*.o
+*.a
+
+# Ignore some building and installation folders
+install/
+
+# Ignore macOS finder files
+*.DS_Store*

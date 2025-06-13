@@ -1,0 +1,106 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# Virtual environments
+.venv/
+venv/
+ENV/
+env/
+.env.local
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+.DS_Store
+
+# Test output
+test_output/
+demo_output/
+output/
+results/
+*.log
+
+# Temporary files
+*.tmp
+*_output/
+co2_storage_detailed/
+geothermal_output/
+test_geothermal/
+test_comments/
+
+# Environment files
+.env
+CLAUDE.md
+
+# UV
+uv.lock
+
+# Documentation build
+docs/_build/
+*.aux
+*.out
+*.toc
+*.pdf
+*.synctex.gz
+*.fdb_latexmk
+*.fls
+*.nav
+*.snm
+*.vrb
+*.bbl
+*.blg
+*.bcf
+*.run.xml
+
+# Exclude entire docs folder for LaTeX presentations
+docs/
+
+# Embeddings and large files
+embeddings/
+*.sqlite3
+*.db
+*.pkl
+*.h5
+*.hdf5
+*.parquet
+*.arrow
+
+# Model outputs
+output/
+generated_models/
+test_output/
+
+# Logs
+logs/
+*.log
+
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# Temporary test files
+test_co2_model/
+test_chroma.py

@@ -1,0 +1,57 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+.pytest_cache/
+.coverage
+.hypothesis/
+.mypy_cache/
+.dmypy.json
+dmypy.json
+.ruff_cache/
+
+# Virtual environments
+.venv/
+venv/
+ENV/
+env/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Project specific
+output/
+embeddings/
+logs/
+*.log
+test_co2_model/
+test_chroma.py
+
+# Git
+.git/
+.gitignore
+
+# Documentation build artifacts
+docs/_build/
+docs/.doctrees/
+
+# Temporary files
+*.tmp
+*.temp
+.env.local
+.env.*.local
+
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# Keep .env.example
+!.env.example

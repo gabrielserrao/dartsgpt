@@ -1,0 +1,139 @@
+import numpy as np
+import matplotlib.pyplot as plt
+import xarray as xr
+
+from dartsflash.libflash import FlashParams, EoSParams, EoS, InitialGuess
+from dartsflash.libflash import Flash
+from dartsflash.libflash import CubicEoS, AQEoS, Ballard
+
+from dartsflash.mixtures import Mixture
+from dartsflash.pyflash import PyFlash
+from dartsflash.plot import *
+
+
+if 1:
+    components = ["H2S", "C1"]
+    # components = ["C1", "nC4"]
+    mix = Mixture(components=components)
+    f = PyFlash(mixture=mix)
+
+    f.add_eos("CEOS", CubicEoS(mix.comp_data, CubicEoS.SRK),
+              initial_guesses=[InitialGuess.Yi.Wilson, InitialGuess.Yi.Wilson13],
+              stability_tol=1e-20, switch_tol=1e-2, max_iter=50)
+
+    eos_order = ["CEOS"]
+    np_max = 3
+
+elif 0:
+    components = ["H2O", "CO2"]
+
+    mix = Mixture(components)
+    f = PyFlash(mixture=mix)
+
+    ceos = CubicEoS(mix.comp_data, CubicEoS.PR)
+    ceos.set_preferred_roots(i=0, x=0.75, root_flag=EoS.MAX)
+    f.add_eos("CEOS", ceos, initial_guesses=[0, 1],
+              switch_tol=1e-1, stability_tol=1e-20, max_iter=50, use_gmix=False)
+    f.add_eos("AQ", AQEoS(mix.comp_data, {AQEoS.water: AQEoS.Jager2003,
+                                          AQEoS.solute: AQEoS.Ziabakhsh2012}),
+              switch_tol=1e-2, stability_tol=1e-16,
+              initial_guesses=[0], eos_range={0: [0.6, 1.]}, max_iter=10, use_gmix=True)
+
+    if 0:
+        f.add_eos("sI", Ballard(mix.comp_data, "sI"),
+                  initial_guesses=[0], max_iter=20, switch_tol=1e2)
+        eos_order = ["AQ", "sI", "CEOS"]
+        np_max = 3
+    else:
+        eos_order = ["AQ", "CEOS"]
+        np_max = 2
+
+    f.flash_params.stability_variables = FlashParams.alpha
+    f.flash_params.split_variables = FlashParams.nik
+    f.flash_params.split_tol = 1e-20
+    f.flash_params.split_switch_tol = 1e-1
+    f.flash_params.tpd_close_to_boundary = 1e-2
+    # f.flash_params.negative_
+    f.flash_params.tpd_tol = 1e-11
+
+f.flash_params.verbose = 0
+f.init_flash(flash_type=PyFlash.FlashType.StabilityFlash, eos_order=eos_order, np_max=np_max)
+
+""" Define compositions """
+dz = 0.005
+min_z = [0.]
+max_z = [1.]
+compositions = {}
+compositions[components[0]] = np.arange(min_z[0], max_z[0]+0.1*dz, dz)
+compositions[components[1]] = 1.
+
+x0 = compositions[components[0]]
+
+if 1:
+    """ Plot GE and tpd """
+    state_spec = {'pressure': 39.8*1.01325,
+                  'temperature': 190.
+                  }
+
+    lnphi_properties = {'lnphi_' + eosname: eos.lnphi for eosname, eos in f.eos.items()}
+    lnphi_1p = f.evaluate_phase_properties_1p(state_spec=state_spec, compositions=compositions, mole_fractions=True,
+                                              properties_to_evaluate=lnphi_properties, print_state="lnphi")
+
+    props = {"G": EoS.Property.GIBBS}
+    results_1p = f.evaluate_properties_1p(state_spec=state_spec, compositions=compositions, mole_fractions=True,
+                                          print_state="1P", properties_to_evaluate={}, mix_properties_to_evaluate=props)
+    sp_results = f.evaluate_stationary_points(state_spec=state_spec, compositions=compositions, mole_fractions=True,
+                                              print_state="TPD")
+    flash_results = f.evaluate_flash(state_spec=state_spec, compositions=compositions, mole_fractions=True,
+                                     print_state="Flash")
+
+    xref = 0.35
+    ref_comp = [xref, 1.-xref]
+    PlotTPD.binary_tpd(f, state=state_spec, ref_composition=ref_comp, variable_comp_idx=0, dz=dz, min_z=min_z, max_z=max_z,
+                       title="TPD for " + mix.name, lnphi_1p=lnphi_1p, flash_results=flash_results, sp_results=sp_results,
+                       )
+
+    PlotProps.binary(f, state=state_spec, variable_comp_idx=0, dz=dz, min_z=min_z, max_z=max_z,
+                     prop_name="G_mix", title="Gibbs energy of mixing for " + mix.name, plot_1p=True,
+                     props=results_1p, flash_results=flash_results, sp_results=sp_results, composition_to_plot=ref_comp
+                     )
+
+if 0:
+    """ Plot PT, Px and Tx diagrams """
+    if 0:
+        # PT
+        state_spec = {"pressure": np.arange(10, 300, 5),
+                      "temperature": np.arange(273.15, 673.15, 5),
+                      }
+    elif 0:
+        # Px
+        state_spec = {"pressure": np.arange(1, 300, 1),
+                      "temperature": 473.15,
+                      }
+    else:
+        # Tx
+        state_spec = {"temperature": np.arange(273.15, 573.15, 1),
+                      "pressure": 100.,
+                      }
+    composition = [0.5]
+    composition += [1. - sum(composition)]
+
+    props = {"G": EoS.Property.GIBBS}
+    results_1p = f.evaluate_properties_1p(state_spec=state_spec, compositions=compositions, mole_fractions=True,
+                                          print_state="1P", properties_to_evaluate={}, mix_properties_to_evaluate=props)
+    flash_results = f.evaluate_flash(state_spec=state_spec, compositions=compositions, mole_fractions=True,
+                                     print_state="Flash")
+    results_np = f.evaluate_properties_np(state_spec=state_spec, compositions=compositions, state_variables=['pressure', 'temperature'] + components,
+                                          print_state="NP", flash_results=flash_results, mix_properties_to_evaluate=props)
+
+    # PlotFlash.pt(f, flash_results, composition=composition)
+    plot1p = True
+    results = results_1p if plot1p else results_np
+    PlotProps.binary(f, state={"pressure": 60., "temperature": 273.15}, variable_comp_idx=0, dz=dz, min_z=min_z, max_z=max_z,
+                     prop_name="G_mix", plot_1p=plot1p, props=results, flash_results=flash_results,
+                     composition_to_plot=composition
+                     )
+    PlotFlash.binary(f, flash_results, variable_comp_idx=0, dz=dz, state=state_spec, min_z=min_z, max_z=max_z, plot_phase_fractions=True)
+    PlotPhaseDiagram.binary(f, flash_results, variable_comp_idx=0, dz=dz, state=state_spec, min_z=min_z, max_z=max_z)
+
+plt.show()

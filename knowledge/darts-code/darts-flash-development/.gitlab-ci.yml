@@ -1,0 +1,420 @@
+stages:
+    - build
+    - test
+    - deploy
+
+###################################################################################
+
+build-linux-3.12:
+    rules:
+        - if: $CI_COMMIT_BRANCH == "main" || $CI_COMMIT_TAG =~ /^v?[0-9]+\.[0-9]+\.[0-9]+/
+        - if: $TEST_ALL == "1"
+    extends: .build-linux-dockcross
+    variables:
+        PY_VER: '3.12'       # for python image selection in .build-linux
+        PY_SUF: 'cp312-cp312' # for python path selection in .build-linux-dockcross
+
+build-linux-3.11:
+    rules:
+        - if: $CI_COMMIT_BRANCH == "main" || $CI_COMMIT_TAG =~ /^v?[0-9]+\.[0-9]+\.[0-9]+/
+        - if: $TEST_ALL == "1"
+    extends: .build-linux-dockcross
+    variables:
+        PY_VER: '3.11'       # for python image selection in .build-linux
+        PY_SUF: 'cp311-cp311' # for python path selection in .build-linux-dockcross
+
+build-linux-3.10:
+    rules:
+        - if: $CI_COMMIT_BRANCH == "main" || $CI_COMMIT_TAG =~ /^v?[0-9]+\.[0-9]+\.[0-9]+/
+        - if: $TEST_ALL == "1"
+    extends: .build-linux-dockcross
+    variables:
+        PY_VER: '3.10'       # for python image selection in .build-linux
+        PY_SUF: 'cp310-cp310' # for python path selection in .build-linux-dockcross
+        
+build-linux-3.9: # for protected branches or merge requests
+    rules:
+        - if: $CI_COMMIT_REF_PROTECTED == "true"
+        - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+        - if: $CI_COMMIT_BRANCH == "main" || $CI_COMMIT_TAG =~ /^v?[0-9]+\.[0-9]+\.[0-9]+/
+        - if: $TEST_ALL == "1"
+    extends: .build-linux-dockcross
+    variables:
+        PY_VER: '3.9'       # for python image selection in .build-linux
+        PY_SUF: 'cp39-cp39' # for python path selection in .build-linux-dockcross
+        
+build-linux-3.8:
+    rules:
+        - if: $CI_COMMIT_BRANCH == "main" || $CI_COMMIT_TAG =~ /^v?[0-9]+\.[0-9]+\.[0-9]+/
+        - if: $TEST_ALL == "1"
+    extends: .build-linux-dockcross
+    variables:
+        PY_VER: '3.8'       # for python image selection in .build-linux
+        PY_SUF: 'cp38-cp38' # for python path selection in .build-linux-dockcross
+    
+###################################################################################
+
+build-windows-3.12:
+    rules:
+        - if: $CI_COMMIT_BRANCH == "main" || $CI_COMMIT_TAG =~ /^v?[0-9]+\.[0-9]+\.[0-9]+/
+        - if: $TEST_ALL == "1"
+    extends: .build-windows
+    variables:
+        PY_VER: '3.12'
+        PYTHONPATH: 'D:\Python312'
+        PY_SUF: 'cp312-cp312'
+
+build-windows-3.11:
+    rules:
+        - if: $CI_COMMIT_BRANCH == "main" || $CI_COMMIT_TAG =~ /^v?[0-9]+\.[0-9]+\.[0-9]+/
+        - if: $TEST_ALL == "1"
+    extends: .build-windows
+    variables:
+        PY_VER: '3.11'
+        PYTHONPATH: 'D:\Python311'        
+        PY_SUF: 'cp311-cp311'
+
+build-windows-3.10:
+    rules:
+        - if: $CI_COMMIT_BRANCH == "main" || $CI_COMMIT_TAG =~ /^v?[0-9]+\.[0-9]+\.[0-9]+/
+        - if: $TEST_ALL == "1"
+    extends: .build-windows
+    variables:
+        PY_VER: '3.10'
+        PYTHONPATH: 'D:\Python310'        
+        PY_SUF: 'cp310-cp310'
+        
+build-windows-3.9: # for protected branches or merge requests
+    rules:
+        - if: $CI_COMMIT_REF_PROTECTED == "true"
+        - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+        - if: $CI_COMMIT_BRANCH == "main" || $CI_COMMIT_TAG =~ /^v?[0-9]+\.[0-9]+\.[0-9]+/
+        - if: $TEST_ALL == "1"
+    extends: .build-windows
+    variables:
+        PY_VER: '3.9'
+        PYTHONPATH: 'D:\Python39'        
+        PY_SUF: 'cp39-cp39'
+        
+build-windows-3.8:
+    rules:
+        - if: $CI_COMMIT_BRANCH == "main" || $CI_COMMIT_TAG =~ /^v?[0-9]+\.[0-9]+\.[0-9]+/
+        - if: $TEST_ALL == "1"
+    extends: .build-windows
+    variables:
+        PY_VER: '3.8'
+        PYTHONPATH: 'D:\Python38'
+        PY_SUF: 'cp38-cp38'
+
+###################################################################################
+
+.build-linux-dockcross:
+    extends: .build-linux
+    # Dockcross is an image specifically made for building Python wheels, based on CentOS 7 with old glibc - it will run on even old systems
+    image: dockcross/manylinux2014-x64:latest
+
+###################################################################################
+     
+.build-linux:
+    stage: build
+    image: "python:$PY_VER"
+    # Will be executed on runner with linux tag - that assumed to run on linux host
+    tags:
+        - linux
+    before_script:
+        - export PATH="/opt/python/$PY_SUF/bin:$PATH"
+        - export PY_SUFFIX=`python3 -c "import importlib.machinery; print(importlib.machinery.EXTENSION_SUFFIXES[0])"`
+        - python3 -m pip install --upgrade pip
+        - python3 -m pip install wheel    
+        - python3 -m pip install build 
+    script:
+        - ./helper_scripts/build.sh -s -w -j 8
+    artifacts:
+      paths:
+        - './dist/*.whl'
+        - './build/Testing/Temporary/LastTest.log'
+      expire_in: 1 months
+      
+###################################################################################
+
+.build-windows:
+    stage: build
+    # Will be executed on runner with windows shell tag - that assumed to run on windows host with shell executor
+    tags: 
+        - windows-shell
+    script:
+        # Load MS Build Tools environment to the powershell
+        - D:\BuildTools\build_vars.ps1
+        # Add python folder to PATH
+        - $env:PATH +=";" + $env:PYTHONPATH + ";" + $env:PYTHONPATH + "\Scripts"
+        - $env:ARCH_SUF=python.exe -c "import importlib.machinery; print(importlib.machinery.EXTENSION_SUFFIXES[0].split('.')[1].split('-')[1])"
+        - mkdir package
+        - mkdir package\dartsflash
+        # copy VS redist libraries 
+        - copy $env:VCToolsRedistDir\x64\Microsoft.VC143.CRT\msvcp140.dll package\dartsflash
+        - copy $env:VCToolsRedistDir\x64\Microsoft.VC143.CRT\vcruntime140.dll package\dartsflash
+        - copy $env:VCToolsRedistDir\x64\Microsoft.VC143.OpenMP\vcomp140.dll package\dartsflash
+        # compile the libs and build the wheel
+        - .\helper_scripts\build.bat -s -w -j 8
+    artifacts:
+      paths:
+        - '.\dist\*.whl'
+        - '.\build\Testing\Temporary\LastTest.log'
+      expire_in: 1 months
+
+###################################################################################
+
+test-linux-3.12:
+    rules:
+        - if: $CI_COMMIT_BRANCH == "main" || $CI_COMMIT_TAG =~ /^v?[0-9]+\.[0-9]+\.[0-9]+/
+        - if: $TEST_ALL == "1"
+    extends: .test-linux
+    variables:
+        PY_VER: '3.12'       # for python image selection in .test-linux
+        PY_SUF: 'cp312-cp312' # for python path selection in .test-linux
+    dependencies:
+        - build-linux-3.12
+
+test-linux-3.11:
+    rules:
+        - if: $CI_COMMIT_BRANCH == "main" || $CI_COMMIT_TAG =~ /^v?[0-9]+\.[0-9]+\.[0-9]+/
+        - if: $TEST_ALL == "1"
+    extends: .test-linux
+    variables:
+        PY_VER: '3.11'       # for python image selection in .test-linux
+        PY_SUF: 'cp311-cp311' # for python path selection in .test-linux
+    dependencies:
+        - build-linux-3.11
+
+test-linux-3.10:
+    rules:
+        - if: $CI_COMMIT_BRANCH == "main" || $CI_COMMIT_TAG =~ /^v?[0-9]+\.[0-9]+\.[0-9]+/
+        - if: $TEST_ALL == "1"
+    extends: .test-linux
+    variables:
+        PY_VER: '3.10'       # for python image selection in .test-linux
+        PY_SUF: 'cp310-cp310' # for python path selection in .test-linux
+    dependencies:
+        - build-linux-3.10
+
+test-linux-3.9: # for protected branches or merge requests
+    rules:
+        - if: $CI_COMMIT_REF_PROTECTED == "true"
+        - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+        - if: $CI_COMMIT_BRANCH == "main" || $CI_COMMIT_TAG =~ /^v?[0-9]+\.[0-9]+\.[0-9]+/
+        - if: $TEST_ALL == "1"
+    extends: .test-linux
+    variables:
+        PY_VER: '3.9'       # for python image selection in .test-linux
+        PY_SUF: 'cp39-cp39' # for python path selection in .test-linux
+    dependencies:
+        - build-linux-3.9
+        
+test-linux-3.8:
+    rules:
+        - if: $CI_COMMIT_BRANCH == "main" || $CI_COMMIT_TAG =~ /^v?[0-9]+\.[0-9]+\.[0-9]+/
+        - if: $TEST_ALL == "1"
+    extends: .test-linux
+    variables:
+        PY_VER: '3.8'       # for python image selection in .test-linux
+        PY_SUF: 'cp38-cp38' # for python path selection in .test-linux
+    dependencies:
+        - build-linux-3.8
+
+###################################################################################
+
+test-windows-3.12:
+    rules:
+        - if: $CI_COMMIT_BRANCH == "main" || $CI_COMMIT_TAG =~ /^v?[0-9]+\.[0-9]+\.[0-9]+/
+        - if: $TEST_ALL == "1"
+    extends: .test-windows
+    variables:
+        PY_VER: '3.12'
+        PYTHONPATH: 'D:\Python312'
+    dependencies:
+        - build-windows-3.12
+
+test-windows-3.11:
+    rules:
+        - if: $CI_COMMIT_BRANCH == "main" || $CI_COMMIT_TAG =~ /^v?[0-9]+\.[0-9]+\.[0-9]+/
+        - if: $TEST_ALL == "1"
+    extends: .test-windows
+    variables:
+        PY_VER: '3.11'
+        PYTHONPATH: 'D:\Python311' 
+    dependencies:
+        - build-windows-3.11
+        
+test-windows-3.10:
+    rules:
+        - if: $CI_COMMIT_BRANCH == "main" || $CI_COMMIT_TAG =~ /^v?[0-9]+\.[0-9]+\.[0-9]+/
+        - if: $TEST_ALL == "1"
+    extends: .test-windows
+    variables:
+        PY_VER: '3.10'
+        PYTHONPATH: 'D:\Python310' 
+    dependencies:
+        - build-windows-3.10
+
+test-windows-3.9: # for protected branches or merge requests
+    rules:
+        - if: $CI_COMMIT_REF_PROTECTED == "true"
+        - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+        - if: $CI_COMMIT_BRANCH == "main" || $CI_COMMIT_TAG =~ /^v?[0-9]+\.[0-9]+\.[0-9]+/
+        - if: $TEST_ALL == "1"
+    extends: .test-windows
+    variables:
+        PY_VER: '3.9'
+        PYTHONPATH: 'D:\Python39' 
+    dependencies:
+        - build-windows-3.9
+        
+test-windows-3.8:
+    rules:
+        - if: $CI_COMMIT_BRANCH == "main" || $CI_COMMIT_TAG =~ /^v?[0-9]+\.[0-9]+\.[0-9]+/
+        - if: $TEST_ALL == "1"
+    extends: .test-windows
+    variables:
+        PY_VER: '3.8'
+        PYTHONPATH: 'D:\Python38'
+    dependencies:
+        - build-windows-3.8
+
+###################################################################################
+
+.test-linux:
+    stage: test
+    image: "python:$PY_VER"
+    # Will be executed on runner with linux tag - that assumed to run on linux host
+    tags:
+        - linux
+    before_script:
+        - export PYTHONUNBUFFERED=1
+        # upgrade pip package first
+        - python -m pip install --upgrade pip
+        - pip install setuptools
+        # complex command to create fake wheel and figure out the proper name for current python and platform
+        - export WHEEL_NAME=`python3 -c "from setuptools.dist import Distribution;from distutils.core import  Extension;dist = Distribution({'name':'open_darts_flash', 'version':'0.10.0', 'ext_modules':[Extension('mylib', ['mysrc.pyx', 'native.c'])]});bdist_wheel_cmd = dist.get_command_obj('bdist_wheel');print(bdist_wheel_cmd.wheel_dist_name + '-' + '-'.join(bdist_wheel_cmd.get_tag())+ '.whl');"`
+        - ls ./dist/*
+        # force reinstall of wheel only (need to force because wheel version is not incremented)
+        # note: need to force here only for Windows actually, but lets be consistent and force for Linux too in case its behaviour will change
+        - pip install --force-reinstall --no-deps ./dist/$WHEEL_NAME[test]
+        # force-reinstall of dependencies takes too much time, lets only upgrade (eagerly!) them
+        - pip install --upgrade --upgrade-strategy eager ./dist/$WHEEL_NAME[test]
+        # run pytest
+        - pytest tests/python
+    script:
+        - echo "test finished"
+    #artifacts:
+    #  paths:
+    #    - '*.log'
+    #  when: always
+    #  expire_in: 1 year
+
+###################################################################################
+
+.test-windows:
+    stage: test
+    # Will be executed on runner with windows tag - that assumed to run on windows host
+    tags:
+        - windows-shell
+    before_script:
+        - $env:PATH +=";" + $env:PYTHONPATH + ";" + $env:PYTHONPATH + "\Scripts"
+        # enable unbuffered output so that everything goes to log file in a correct order
+        - $env:PYTHONUNBUFFERED = 1
+        - $env:PYTHONLEGACYWINDOWSSTDIO = 1
+        # upgrade pip package first
+        - python -m pip install --upgrade pip
+        - pip install setuptools
+        # complex command to create fake wheel and figure out the proper name for current python and platform
+        - $env:WHEEL_NAME=python.exe -c "from setuptools.dist import Distribution;from distutils.core import  Extension;dist = Distribution({'name':'open_darts_flash', 'version':'0.10.0', 'ext_modules':[Extension('mylib', ['mysrc.pyx', 'native.c'])]});bdist_wheel_cmd = dist.get_command_obj('bdist_wheel');print(bdist_wheel_cmd.wheel_dist_name + '-' + '-'.join(bdist_wheel_cmd.get_tag())+ '.whl');"
+        # force reinstall of wheel only (need to force because wheel version is not incremented)
+        - pip install --force-reinstall --no-deps .\dist\$env:WHEEL_NAME[test]
+        # force-reinstall of dependencies takes too much time, lets only upgrade (eagerly!) them
+        - pip install --upgrade --upgrade-strategy eager .\dist\$env:WHEEL_NAME[test]
+        # run pytest
+        - pytest tests\python
+    script:
+        - echo "test finished"
+    #artifacts:
+    #  paths:
+    #    - '*.log'
+    #  when: always
+    #  expire_in: 1 year
+
+###################################################################################
+
+deploy-pypi:
+    # Publish the release
+    # Runs only for the main branch and if tag has a pattern: v#.#.#, for example "v1.2.3"
+    rules: 
+        - if: $CI_COMMIT_TAG =~ /^v?[0-9]+\.[0-9]+\.[0-9]+/
+    extends: .deploy-pypi
+    variables:
+        REPO: 'pypi'
+        REPOUSER: $PYPIUSER
+        REPOPWD: $PYPIPWD
+
+deploy-testpypi:
+    # Test publishing the release
+    # Runs only manually, if variable UPLOAD_TEST_PYPI set to 1
+    only:
+        variables:
+            - $UPLOAD_TEST_PYPI == "1"
+    extends: .deploy-pypi
+    variables:
+        REPO: 'testpypi'
+        REPOUSER: $TESTPYPIUSER
+        REPOPWD: $TESTPYPIPWD
+
+
+# pick all whl artifacts (windows/linux, different python versions) and upload to test pipy
+# TODO auto-increment package version (in setup.py and .gitlab-ci.yml) and add git tag; now it is done manually
+.deploy-pypi:
+    stage: deploy
+    # just for twine
+    image: python:3.9
+    # Will be executed on runner with windows tag - that assumed to run on windows host
+    tags:
+        - linux
+    before_script:
+        # upgrade pip package first
+        - python -m pip install --upgrade pip
+        - pip install twine
+    script:
+        # upload to test-pypi or pypi depending on $PYPI var
+        - ./rename_whls.sh # rename linux whls to make uploadable to test-pypi 
+        - ls ./dist/*
+        - twine upload -u $REPOUSER -p $REPOPWD -r $REPO --verbose dist/*
+    dependencies:
+        - build-linux-3.8
+        - build-linux-3.9
+        - build-linux-3.10
+        - build-linux-3.11
+        - build-linux-3.12
+        - build-windows-3.8
+        - build-windows-3.9
+        - build-windows-3.10
+        - build-windows-3.11
+        - build-windows-3.12
+
+deploy-zenodo:
+    stage: deploy
+    rules:
+        - if: $CI_COMMIT_TAG =~ /^v?[0-9]+\.[0-9]+\.[0-9]+/
+    tags:
+        - linux
+    image: python:3.9
+    script:
+        # cloning gitlab2zenodo in a temporary folder
+        - mkdir tmp_gitlab2zenodo
+        - cd tmp_gitlab2zenodo
+        - git clone https://gitlab.com/sbeniamine/gitlab2zenodo.git
+        - cd gitlab2zenodo
+        # and installing gitlab2zenodo
+        - pip install .
+        - cd ../..
+        # making a .zip containing the source files
+        - git archive --format zip --output ${CI_COMMIT_TAG#v}.zip ${CI_COMMIT_TAG}
+        # command that publishes to zenodo
+        - g2z-send -p -m .zenodo.json ${CI_COMMIT_TAG#v}.zip
